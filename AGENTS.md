@@ -7,7 +7,7 @@ mvn clean compile   # compilar (con limpieza)
 mvn javafx:run      # lanzar la app JavaFX (requiere display)
 ```
 
-No hay suite de tests, linter, formatter ni CI. `mvn clean compile` es la única verificación automatizada.
+No hay suite de tests, linter, formatter ni CI. `mvn clean compile` es la única verificación automatizada. En Linux, ejecutar la app requiere las librerías GTK3 del sistema instaladas.
 
 La documentación oficial del proyecto (arquitectura, stack, CRUD y guía de ejecución, para presentación académica) vive en `README.md` en la raíz — si algo cambia de arquitectura, actualizarlo junto con el código.
 

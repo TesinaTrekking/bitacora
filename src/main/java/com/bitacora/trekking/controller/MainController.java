@@ -6,7 +6,9 @@ import com.bitacora.trekking.model.Checkpoint;
 import com.bitacora.trekking.util.AlertUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -14,10 +16,18 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -27,7 +37,9 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.sql.SQLException;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,14 +50,19 @@ import java.util.logging.Logger;
 public class MainController {
 
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
-    private static final double SCENE_WIDTH = 950.0;
+    private static final double SCENE_WIDTH = 1050.0;
     private static final double SCENE_HEIGHT = 600.0;
 
     private final CheckpointDAO checkpointDAO = new CheckpointDAO();
     private final ObservableList<Checkpoint> checkpointList = FXCollections.observableArrayList();
 
+    // Vista filtrada sobre los datos completos: la tabla muestra el subconjunto
+    // que cumple el filtro de texto, sin modificar la lista persistida.
+    private final FilteredList<Checkpoint> filteredList = new FilteredList<>(checkpointList, checkpoint -> true);
+
     private TableView<Checkpoint> tableView;
     private Stage primaryStage;
+    private Label counterLabel;
 
     /**
      * Inicializa la base de datos, carga los datos y muestra la ventana principal.
@@ -72,19 +89,29 @@ public class MainController {
     private Scene buildScene() {
         // La tabla se crea antes que la barra para enlazar el estado de los botones
         // de acción a la selección actual.
-        tableView = new TableView<>(checkpointList);
+        tableView = new TableView<>(filteredList);
         tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        tableView.setPlaceholder(new Label("No hay checkpoints registrados. Use \"+ Nuevo Checkpoint\" para agregar uno."));
         configureColumns();
+        configureRowInteractions();
 
-        VBox mainLayout = new VBox(15, buildTopBar(), tableView);
+        VBox mainLayout = new VBox(15, buildTopBar(), tableView, buildFooter());
         mainLayout.setPadding(new Insets(15));
         VBox.setVgrow(tableView, Priority.ALWAYS);
 
-        return new Scene(mainLayout, SCENE_WIDTH, SCENE_HEIGHT);
+        Scene scene = new Scene(mainLayout, SCENE_WIDTH, SCENE_HEIGHT);
+        configureShortcuts(scene);
+        return scene;
     }
 
     private HBox buildTopBar() {
         Label titleLabel = new Label("Bitácora");
+
+        TextField filterField = new TextField();
+        filterField.setPromptText("Filtrar por nombre, hora o descripción…");
+        filterField.setPrefWidth(240);
+        filterField.textProperty().addListener((obs, oldValue, newValue) ->
+                filteredList.setPredicate(createFilterPredicate(newValue)));
 
         Button newButton = new Button("+ Nuevo Checkpoint");
         newButton.setOnAction(event -> showCreateDialog());
@@ -92,48 +119,168 @@ public class MainController {
         // Editar/Eliminar actúan sobre la fila seleccionada: se deshabilitan sin selección.
         Button editButton = new Button("Editar");
         editButton.disableProperty().bind(tableView.getSelectionModel().selectedItemProperty().isNull());
-        editButton.setOnAction(event -> {
-            Checkpoint selected = tableView.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                showEditDialog(selected);
-            }
-        });
+        editButton.setOnAction(event -> editSelected());
 
         Button deleteButton = new Button("Eliminar");
         deleteButton.disableProperty().bind(tableView.getSelectionModel().selectedItemProperty().isNull());
-        deleteButton.setOnAction(event -> {
-            Checkpoint selected = tableView.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                confirmAndDelete(selected);
-            }
-        });
+        deleteButton.setOnAction(event -> deleteSelected());
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox topBar = new HBox(15, titleLabel, spacer, newButton, editButton, deleteButton);
+        HBox topBar = new HBox(15, titleLabel, spacer, filterField, newButton, editButton, deleteButton);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(15, 20, 15, 20));
         return topBar;
     }
 
+    private HBox buildFooter() {
+        counterLabel = new Label();
+        updateCounter();
+        // El contador refleja tanto el total persistido como la cantidad visible
+        // tras aplicar el filtro de texto (desambiguar "Mostrando X de Y").
+        checkpointList.addListener((ListChangeListener<Checkpoint>) change -> updateCounter());
+        filteredList.addListener((ListChangeListener<Checkpoint>) change -> updateCounter());
+
+        HBox footer = new HBox(counterLabel);
+        footer.setAlignment(Pos.CENTER_LEFT);
+        footer.setPadding(new Insets(0, 20, 0, 20));
+        return footer;
+    }
+
+    private void updateCounter() {
+        int total = checkpointList.size();
+        int visibles = filteredList.size();
+        String unidad = total == 1 ? " checkpoint" : " checkpoints";
+        counterLabel.setText(total == visibles
+                ? total + unidad
+                : "Mostrando " + visibles + " de " + total + unidad);
+    }
+
+    /**
+     * Predicate para el filtro en vivo: matchea (sin distinción de mayúsculas)
+     * nombre, hora o descripción; texto vacío muestra todos los registros.
+     */
+    private static Predicate<Checkpoint> createFilterPredicate(String texto) {
+        String filtro = texto == null ? "" : texto.trim().toLowerCase(Locale.ROOT);
+        if (filtro.isEmpty()) {
+            return checkpoint -> true;
+        }
+        return checkpoint -> containsIgnoreCase(checkpoint.getNombre(), filtro)
+                || containsIgnoreCase(checkpoint.getHora(), filtro)
+                || containsIgnoreCase(checkpoint.getDescripcion(), filtro);
+    }
+
+    private static boolean containsIgnoreCase(String valor, String filtro) {
+        return valor != null && valor.toLowerCase(Locale.ROOT).contains(filtro);
+    }
+
+    private void configureShortcuts(Scene scene) {
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.N, KeyCombination.SHORTCUT_DOWN),
+                this::showCreateDialog);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.E, KeyCombination.SHORTCUT_DOWN),
+                this::editSelected);
+        scene.getAccelerators().put(new KeyCodeCombination(KeyCode.DELETE), this::deleteSelected);
+    }
+
+    private void editSelected() {
+        Checkpoint selected = tableView.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            showEditDialog(selected);
+        }
+    }
+
+    private void deleteSelected() {
+        Checkpoint selected = tableView.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            confirmAndDelete(selected);
+        }
+    }
+
+    /**
+     * Doble clic para editar y menú contextual por fila: ambos operan sobre el
+     * checkpoint de la fila bajo el cursor (no sobre la selección, que puede no
+     * reflejar un clic derecho).
+     */
+    private void configureRowInteractions() {
+        tableView.setRowFactory(tv -> {
+            TableRow<Checkpoint> row = new TableRow<>();
+            ContextMenu contextMenu = new ContextMenu();
+            MenuItem editItem = new MenuItem("Editar");
+            editItem.setOnAction(event -> {
+                Checkpoint item = row.getItem();
+                if (item != null) {
+                    showEditDialog(item);
+                }
+            });
+            MenuItem deleteItem = new MenuItem("Eliminar");
+            deleteItem.setOnAction(event -> {
+                Checkpoint item = row.getItem();
+                if (item != null) {
+                    confirmAndDelete(item);
+                }
+            });
+            contextMenu.getItems().addAll(editItem, deleteItem);
+            row.setContextMenu(contextMenu);
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    showEditDialog(row.getItem());
+                }
+            });
+            return row;
+        });
+    }
+
     private void configureColumns() {
         TableColumn<Checkpoint, String> horaColumn = new TableColumn<>("Hora");
         horaColumn.setCellValueFactory(new PropertyValueFactory<>("hora"));
+        horaColumn.setPrefWidth(80);
 
         TableColumn<Checkpoint, String> nombreColumn = new TableColumn<>("Checkpoint / Nombre");
         nombreColumn.setCellValueFactory(new PropertyValueFactory<>("nombre"));
+        nombreColumn.setPrefWidth(230);
 
         TableColumn<Checkpoint, Number> latitudColumn = new TableColumn<>("Latitud");
         latitudColumn.setCellValueFactory(new PropertyValueFactory<>("latitud"));
+        latitudColumn.setPrefWidth(110);
+        setNumericCellFactory(latitudColumn);
 
         TableColumn<Checkpoint, Number> longitudColumn = new TableColumn<>("Longitud");
         longitudColumn.setCellValueFactory(new PropertyValueFactory<>("longitud"));
+        longitudColumn.setPrefWidth(110);
+        setNumericCellFactory(longitudColumn);
 
         TableColumn<Checkpoint, String> descripcionColumn = new TableColumn<>("Descripción");
         descripcionColumn.setCellValueFactory(new PropertyValueFactory<>("descripcion"));
 
         tableView.getColumns().addAll(horaColumn, nombreColumn, latitudColumn, longitudColumn, descripcionColumn);
+    }
+
+    /**
+     * Las columnas numéricas de coordenadas se alinean a la derecha y recortan
+     * los decimales redundantes para una lectura más limpia.
+     */
+    private static void setNumericCellFactory(TableColumn<Checkpoint, Number> column) {
+        column.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(Number value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty || value == null ? "" : formatCoordinate(value.doubleValue()));
+                setAlignment(Pos.CENTER_RIGHT);
+            }
+        });
+    }
+
+    private static String formatCoordinate(double value) {
+        if (value == 0.0) {
+            return "0.0";
+        }
+        String raw = String.valueOf(value);
+        if (!raw.contains(".")) {
+            return raw;
+        }
+        String trimmed = raw.replaceAll("0+$", "").replaceAll("\\.$", "");
+        return trimmed.isEmpty() ? "0.0" : trimmed;
     }
 
     private boolean initializeDatabase() {
@@ -172,6 +319,10 @@ public class MainController {
                 if (newId != -1) {
                     newCheckpoint.setId(newId);
                     checkpointList.add(newCheckpoint);
+                    // El registro recién creado queda seleccionado y visible para
+                    // confirmar visualmente el alta.
+                    tableView.getSelectionModel().select(newCheckpoint);
+                    tableView.scrollTo(newCheckpoint);
                 } else {
                     AlertUtils.showError(primaryStage, "Error al guardar",
                             "No se pudo guardar el checkpoint en la base de datos.");
