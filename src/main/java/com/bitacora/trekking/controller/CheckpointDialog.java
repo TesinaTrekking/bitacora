@@ -2,6 +2,7 @@ package com.bitacora.trekking.controller;
 
 import com.bitacora.trekking.model.Checkpoint;
 import com.bitacora.trekking.util.AlertUtils;
+import javafx.application.Platform;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
@@ -113,6 +114,13 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
             txtLongitud.setText(String.valueOf(checkpointToEdit.getLongitud()));
             txtDescripcion.setText(checkpointToEdit.getDescripcion());
         }
+
+        Platform.runLater(() -> {
+            txtNombre.requestFocus();
+            if (checkpointToEdit != null) {
+                txtNombre.selectAll();
+            }
+        });
 
         grid.addRow(0, new Label("Nombre de Checkpoint"), txtNombre);
         grid.addRow(1, new Label("Hora"), txtHora);

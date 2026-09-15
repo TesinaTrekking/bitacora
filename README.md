@@ -145,13 +145,20 @@ No se utilizan hojas de estilo (CSS) ni paletas de colores: la aplicación conse
 | **Botón principal por defecto** | El botón de confirmación responde a **Enter** (`setDefaultButton(true)`). |
 | **Cancelación con Escape** | El botón Cancelar responde a **Escape** (`setCancelButton(true)`). |
 | **Estados deshabilitados según selección** | Editar y Eliminar se deshabilitan en ausencia de selección mediante `disableProperty().bind(selectionModel().selectedItemProperty().isNull())`. |
+| **Búsqueda/filtro en vivo** | Un `TextField` filtra la tabla al instante por nombre, hora o descripción (sin distinguir mayúsculas) mediante un `FilteredList` que envuelve la lista persistida; texto vacío muestra todos los registros. |
+| **Contador de registros** | Un `Label` en el pie refleja el total de checkpoints y, cuando hay filtro activo, el desglose "Mostrando X de N", actualizado con `ListChangeListener`. |
+| **Doble clic para editar** | Un `TableRow` personalizado abre el diálogo de edición al hacer doble clic sobre una fila. |
+| **Menú contextual** | Clic derecho sobre una fila ofrece "Editar" y "Eliminar", operando sobre el checkpoint de la fila bajo el cursor (no sobre la selección actual). |
+| **Atajos de teclado** | `Ctrl+N` crea, `Ctrl+E` edita la fila seleccionada y `Delete` la elimina (con confirmación), vía *accelerators* de la `Scene`. |
 | **Confirmación explícita** | Toda acción destructiva (eliminar) pide confirmación con `Alert.AlertType.CONFIRMATION` antes de tocar SQLite. |
 | **Feedback modal** | Los errores de BD y validación se reportan con alertas modales (`AlertUtils`), bloqueando la ventana mientras están abiertas. |
+| **Foco inicial y aislamiento del texto** | El diálogo enfoca el primer campo al abrir (`requestFocus`); en modo edición selecciona todo el nombre para sobrescribirlo de un toque. |
+| **Retroalimentación del alta** | El checkpoint recién creado queda seleccionado y visible en la tabla. La tabla vacía muestra un `placeholder` orientativo. |
 | **Pre-información del formulario** | `TextArea` para descripción con 3 filas predefinidas; `promptText` en cada campo con ejemplos reales (p. ej. `Ej. 14:30`). |
 
 ### Composición de la Ventana Principal
 
-La ventana principal (`950×600`, mínima `800×500`) se estructura como un `VBox` con una **barra superior** (título, espaciador elástico y botones `+ Nuevo Checkpoint`, `Editar`, `Eliminar`) y una **`TableView`** con cinco columnas que mapean los atributos del modelo mediante `PropertyValueFactory`: `Hora`, `Checkpoint / Nombre`, `Latitud`, `Longitud`, `Descripción`.
+La ventana principal (`1050×600`, mínima `800×500`) se estructura como un `VBox` con una **barra superior** (título, espaciador elástico, campo de **filtro**, botones `+ Nuevo Checkpoint`, `Editar`, `Eliminar`), la **`TableView`** con cinco columnas que mapean los atributos del modelo mediante `PropertyValueFactory` (`Hora`, `Checkpoint / Nombre`, `Latitud`, `Longitud`, `Descripción`) y un **pie** con el contador de registros.
 
 ## Lógica del CRUD y Persistencia
 
