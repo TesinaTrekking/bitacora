@@ -3,13 +3,13 @@
 ## Compilación y ejecución
 
 ```sh
-mvn clean compile   # compilar (con limpieza)
+mvn clean compile   # compilar (con limpieza) — la única verificación automatizada
 mvn javafx:run      # lanzar la app JavaFX (requiere display)
 ```
 
-No hay suite de tests, linter, formatter ni CI. `mvn clean compile` es la única verificación automatizada. En Linux, ejecutar la app requiere las librerías GTK3 del sistema instaladas.
+No hay tests, linter, formatter ni CI. En Linux, ejecutar la app requiere las librerías GTK3 del sistema.
 
-La documentación oficial del proyecto (arquitectura, stack, CRUD y guía de ejecución, para presentación académica) vive en `README.md` en la raíz — si algo cambia de arquitectura, actualizarlo junto con el código.
+La documentación oficial del proyecto (arquitectura, stack, CRUD y guía de ejecución) vive en `README.md` en la raíz — si algo cambia de arquitectura, actualizarlo junto con el código.
 
 ## Proyecto
 
@@ -19,30 +19,28 @@ Java 17 / JavaFX 21 / SQLite — proyecto Maven de módulo único. Clase princip
 
 | Archivo | Paquete | Rol |
 |---|---|---|
-| `App.java` | raíz | Entry point. Construye la UI de forma programática (sin FXML) vía `MainController`. |
-| `MainController.java` | `controller` | Controlador de la ventana principal: UI, carga de datos y acciones crear/editar/eliminar. |
-| `CheckpointDialog.java` | `controller` | Diálogo modal de creación/edición. |
+| `App.java` | raíz | Entry point. Delega en `MainController`. |
+| `MainController.java` | `controller` | Ventana principal: UI programática (sin FXML), carga de datos, acciones CRUD. |
+| `CheckpointDialog.java` | `controller` | Diálogo modal de creación/edición con validación. |
 | `Checkpoint.java` | `model` | Modelo con propiedades observables de JavaFX (`LongProperty`, `StringProperty`, etc.). |
-| `CheckpointDAO.java` | `dao` | Operaciones CRUD contra SQLite vía JDBC. |
-| `DatabaseManager.java` | `dao` | Factory de conexiones + inicialización de esquema (`CREATE TABLE IF NOT EXISTS`). |
-| `AlertUtils.java` | `util` | Alertas modales compartidas (`showError` / `showWarning`) para errores de BD y validación. |
+| `CheckpointDAO.java` | `dao` | CRUD contra SQLite vía JDBC. |
+| `DatabaseManager.java` | `dao` | Factory de conexiones + inicialización de esquema. |
+| `AlertUtils.java` | `util` | Alertas modales compartidas (`showError` / `showWarning`). |
 
-## Convenciones
+## Convenciones clave
 
 - Toda la UI se construye en código — no existen archivos FXML.
-- Etiquetas y nombres de variables en español en todo el proyecto (el dominio es español).
-- El modelo usa propiedades de JavaFX, no POJOs simples — siempre agregar métodos `*Property()` junto a getters/setters.
-- UI de baja fidelidad: tema estándar Modena de JavaFX, sin archivos CSS. Layout/espaciado se hace en código (`GridPane`, `Insets`, etc.).
-- Diálogos de formulario: layout de dos columnas (`GridPane` etiqueta | campo), `hgap`/`vgap = 10` y padding `10`. El botón principal es default (`setDefaultButton(true)`, responde a Enter) y Cancelar responde a Escape (`setCancelButton(true)`).
-- El diálogo de creación arranca con todos los campos vacíos (sin pre-relleno); el de edición precarga la fila seleccionada.
-- Las acciones de la ventana principal (Editar/Eliminar) se habilitan/deshabilitan enlazadas a la selección de la tabla — mantener `disableProperty().bind(selectionModel().selectedItemProperty().isNull())` para acciones guiadas por selección.
-- Toda eliminación destructiva pide confirmación (`Alert.AlertType.CONFIRMATION`) antes de tocar SQLite.
-- Uso de `java.util.logging.Logger` para registrar errores (no `printStackTrace()` ni `catch` vacíos).
-- Javadoc en clases públicas y métodos no triviales de la capa DAO/controller; comentarios que describen decisiones ("por qué"), no los que repiten el código ("qué").
+- Nombres de variables, clases y paquetes en español (el dominio es español).
+- Modelo con propiedades JavaFX, no POJOs simples — siempre incluir métodos `*Property()` junto a getters/setters.
+- Diálogos de formulario: `GridPane` de dos columnas (etiqueta | campo), `hgap`/`vgap = 10`, padding `10`. Enter = confirmar, Escape = cancelar.
+- Acciones guiadas por selección (Editar/Eliminar): mantener `disableProperty().bind(selectionModel().selectedItemProperty().isNull())`.
+- Toda eliminación pide confirmación (`Alert.AlertType.CONFIRMATION`) antes de tocar SQLite.
+- Errores se registran con `java.util.logging.Logger` (no `printStackTrace()` ni `catch` vacíos).
+- DAO propaga `SQLException`; `update` devuelve `int` (filas afectadas), `delete` devuelve `boolean`.
+- Javadoc en clases públicas y métodos no triviales; comentarios de "por qué", no de "qué".
 
 ## Advertencias (Gotchas)
 
-- **Archivo de BD SQLite** `checkpoints.db` vive en `~/.bitacora-checkpoints/` (ruta estable, independiente del working directory), definido en `DatabaseManager`. El working dir puede contener un `checkpoints.db` local no commiteado: está cubierto por `.gitignore` — evitar commitear datos reales.
-- Existe `.gitignore` que excluye `target/` y `checkpoints.db`.
-- `CheckpointDAO.insert/selectAll/update/delete` lanzan `SQLException` (se reportan vía `AlertUtils`); `update` devuelve cantidad de filas afectadas (`int`) y `delete` devuelve `boolean`. No tragar errores SQL en silencio — mostrarlos.
-- `CheckpointDAO` abre una `Connection` nueva por operación (sin pooling — aceptable para este tamaño de app, tenerlo presente si escala).
+- **BD SQLite** `checkpoints.db` vive en `~/.bitacora-checkpoints/` (ruta estable, definida en `DatabaseManager`), independiente del working directory. El `.gitignore` solo excluye `target/` — no hay exclusión explícita de `checkpoints.db`, así que el archivo local no debería commitearse.
+- `CheckpointDAO` abre una `Connection` nueva por operación (sin pooling — aceptable para este tamaño de app).
+- La app requiere un entorno gráfico para mostrar la ventana (no funciona en modo headless).

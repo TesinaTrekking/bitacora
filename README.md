@@ -1,8 +1,8 @@
 # Bitácora Checkpoints
 
-Sistema desktop de gestión de puntos de control (checkpoints) para bitácoras de ruta, con operaciones **CRUD** completas sobre una base de datos **SQLite** local. La interfaz está construida enteramente en **JavaFX** a través de código (sin FXML), siguiendo una arquitectura en capas.
+Sistema desktop de gestión de puntos de control (checkpoints) para bitácoras de ruta, con operaciones **CRUD** completas sobre **SQLite**. La interfaz se construye enteramente en **JavaFX** (sin FXML), siguiendo una arquitectura en capas.
 
-El proyecto es un **prototipo de baja fidelidad** con fines académicos: su objetivo es demostrar un flujo CRUD completo y funcional (crear, listar, editar y eliminar), priorizando la usabilidad y la correcta separación de responsabilidades por sobre el refinamiento visual.
+**Prototipo de baja fidelidad** con fines académicos: demuestra un flujo CRUD completo (crear, listar, editar, eliminar), priorizando la usabilidad y la separación de responsabilidades por sobre el refinamiento visual.
 
 ## Índice
 
@@ -15,10 +15,10 @@ El proyecto es un **prototipo de baja fidelidad** con fines académicos: su obje
 
 ## Propósito Académico
 
-El proyecto se enmarca en un contexto universitario y persigue dos objetivos de formación:
+El proyecto se enmarca en un contexto universitario con dos objetivos de formación:
 
-1. **Prototipado rápido de baja fidelidad** de un sistema desktop: la aplicación implementa el ciclo completo de una herramienta de escritorio real con persistencia, sin invertir esfuerzo en estética, temas o estilos visuales.
-2. **Práctica de CRUD persistente**: ejercitar las cuatro operaciones fundamentales de un sistema de información (Create, Read, Update, Delete) contra una base de datos relacional, integrando una API gráfica moderna.
+1. **Prototipado de baja fidelidad**: ciclo completo de una app de escritorio con persistencia, sin esfuerzo en estética.
+2. **Práctica de CRUD persistente**: las cuatro operaciones fundamentales contra una BD relacional con API gráfica.
 
 El dominio elegido — una bitácora de ruta con puntos de control georreferenciados — permite modelar una entidad con atributos de distintos tipos (texto, hora y coordenadas numéricas), lo que obliga a implementar validación de datos y conversión de tipos.
 
@@ -31,28 +31,14 @@ El dominio elegido — una bitácora de ruta con puntos de control georreferenci
 | **Maven** | 3.x | Gestión de dependencias y ciclo de vida de compilación |
 | **SQLite** | — (vía `sqlite-jdbc` 3.45.2.0) | Motor de base de datos relacional embebida |
 
-> **Nota**: Java, JavaFX y Maven fueron definidos por la consigna de la materia, por lo que aquí no se defiende su elección sino que se documenta su rol técnico dentro del prototipo.
+> **Nota**: Java, JavaFX y Maven fueron definidos por la consigna de la materia; aquí se documenta su rol técnico dentro del prototipo.
 
-### Lenguaje: Java
+Java 17 provee tipado estático y manejo estructurado de excepciones. JavaFX aporta propiedades observables que alimentan el patrón MVC. Maven gestiona dependencias y ciclo de vida desde `pom.xml`.
 
-**Java 17** aporta el tipado estático del compilador (detecta errores de tipo en tiempo de compilación), el manejo estructurado de excepciones (`try-with-resources`, `SQLException` propagable) y las propiedades observables de JavaFX que alimentan el patrón MVC.
+**SQLite** es serverless y embebida — no requiere servicio externo. La persistencia se implementa vía JDBC (`org.xerial:sqlite-jdbc`). Particularidades:
 
-### Interfaz Gráfica: JavaFX
-
-**JavaFX** (OpenJFX 21.0.2) es el framework de presentación: la UI se construye **enteramente por código** (sin FXML) mediante nodos (`Stage`, `Scene`, `Node`) y layouts, y sus **propiedades observables** (`LongProperty`, `StringProperty`, `DoubleProperty`) permiten que la vista reaccione automáticamente a los cambios del modelo sin sincronización manual.
-
-### Gestión de Proyecto: Maven
-
-**Maven** gestiona las dependencias declaradas en `pom.xml` (`javafx-controls`, `sqlite-jdbc`) y el ciclo de vida de compilación y ejecución (`mvn clean compile`, `mvn javafx:run`).
-
-### Base de Datos: SQLite
-
-**SQLite** se eligió como motor de base de datos relacional **severless** (sin servidor), **liviana** (embebida en la aplicación) e **integrada localmente**, lo que la hace ideal para prototipos: no requiere instalación ni configuración de un servicio externo, y el archivo `.db` resultante es portable. La persistencia se implementa con JDBC a través del driver `org.xerial:sqlite-jdbc`.
-
-Particularidades de la integración:
-
-- La base de datos **`checkpoints.db`** reside en un directorio estable del usuario (`~/.bitacora-checkpoints/`), independiente del directorio de trabajo del repositorio.
-- El **esquema se inicializa automáticamente** al arrancar la aplicación (`CREATE TABLE IF NOT EXISTS`), eliminando pasos manuales de setup.
+- La BD **`checkpoints.db`** vive en `~/.bitacora-checkpoints/`, directorio estable independiente del working directory.
+- El **esquema se inicializa automáticamente** al arrancar (`CREATE TABLE IF NOT EXISTS`).
 
 ## Arquitectura y Patrones de Diseño
 
@@ -88,16 +74,16 @@ La comunicación hacia abajo ocurre exclusivamente vía la capa DAO; la interfaz
 
 ### Capa de Modelo (Model)
 
-- **`Checkpoint`** — Entidad del dominio que representa un punto de control. Sus atributos se exponen como **propiedades observables de JavaFX** (`LongProperty`, `StringProperty`, `DoubleProperty`) para que la tabla y los diálogos reaccionen en tiempo real a los cambios. No es un POJO simple: cada campo cuenta con getter/setter y su correspondiente método `*Property()`. Atributos: `id`, `nombre`, `hora`, `latitud`, `longitud`, `descripcion`.
+- **`Checkpoint`** — Entidad del dominio con **propiedades observables de JavaFX** (`LongProperty`, `StringProperty`, `DoubleProperty`) para reactividad en la tabla y diálogos. Cada campo tiene getter/setter y método `*Property()`. Atributos: `id`, `nombre`, `hora`, `latitud`, `longitud`, `descripcion`.
 
 ### Capa de Persistencia (DAO)
 
-- **`CheckpointDAO`** — Implementa el patrón **Data Access Object (DAO)**: encapsula todas las consultas SQL (JDBC) en métodos de alto nivel, aislando la persistencia de la lógica de presentación. Usa `PreparedStatement` (mitigando inyección SQL) y `try-with-resources` para gestión automática de recursos. Expone `insert`, `selectAll`, `update` y `delete`, y **propaga `SQLException`** para que la UI informe el motivo real del fallo.
+- **`CheckpointDAO`** — Patrón **DAO**: encapsula consultas SQL en métodos de alto nivel usando `PreparedStatement` y `try-with-resources`. Expone `insert`, `selectAll`, `update` y `delete`, y **propaga `SQLException`** para que la UI informe el fallo real.
 
 ### Capa de Conexión (Util / Manager)
 
-- **`DatabaseManager`** — Factory de conexiones (`DriverManager.getConnection`) y **inicialización automática del esquema**: crea el directorio de datos `~/.bitacora-checkpoints/` y ejecuta el `CREATE TABLE IF NOT EXISTS` para la tabla `checkpoints`. Es una clase final con constructor privado (utilitaria).
-- **`AlertUtils`** — Utilidades compartidas de alertas modales (`showError` / `showWarning`) para errores de base de datos y validación, evitando duplicación de código de diálogos.
+- **`DatabaseManager`** — Factory de conexiones y **inicialización automática del esquema**: crea `~/.bitacora-checkpoints/` y ejecuta `CREATE TABLE IF NOT EXISTS`. Clase utilitaria (constructor privado).
+- **`AlertUtils`** — Alertas modales compartidas (`showError` / `showWarning`) para errores de BD y validación.
 
 ### Árbol de Carpetas del Proyecto
 
@@ -122,7 +108,7 @@ bitacora/
 
 ### Patrón de Conexión por Operación
 
-`CheckpointDAO` abre y cierra una **nueva `Connection` por operación** (sin pooling). Para el tamaño de este prototipo es aceptable porque SQLite local es liviano; la decisión queda documentada en el código con miras a una eventual migración a pooling si la aplicación escalara.
+`CheckpointDAO` abre una **nueva `Connection` por operación** (sin pooling). Aceptable para este tamaño de app; documentado para una eventual migración a pooling.
 
 ## Metodología y Decisiones de UI/UX (Baja Fidelidad)
 
@@ -134,7 +120,7 @@ El prototipo concentra el esfuerzo en tres ejes funcionales por encima de lo vis
 2. **Flujo lógico**: orden de acciones claro (seleccionar → editar/eliminar; completar formulario → confirmar).
 3. **Funcionalidad CRUD completa**: cada operación es observable y verificable en la tabla y en la base de datos.
 
-No se utilizan hojas de estilo (CSS) ni paletas de colores: la aplicación conserva el **tema estándar Modena** que distribuye JavaFX, dejando explícita la prioridad de la lógica por sobre la estética.
+No se utilizan CSS ni paletas de colores: la aplicación conserva el **tema Modena** de JavaFX, priorizando la lógica por sobre la estética.
 
 ### Reglas de UX Aplicadas
 
@@ -158,7 +144,7 @@ No se utilizan hojas de estilo (CSS) ni paletas de colores: la aplicación conse
 
 ### Composición de la Ventana Principal
 
-La ventana principal (`1050×600`, mínima `800×500`) se estructura como un `VBox` con una **barra superior** (título, espaciador elástico, campo de **filtro**, botones `+ Nuevo Checkpoint`, `Editar`, `Eliminar`), la **`TableView`** con cinco columnas que mapean los atributos del modelo mediante `PropertyValueFactory` (`Hora`, `Checkpoint / Nombre`, `Latitud`, `Longitud`, `Descripción`) y un **pie** con el contador de registros.
+La ventana principal (`1050×600`, mín. `800×500`) se estructura como un `VBox` con una **barra superior** (título, espaciador, filtro, botones `+ Nuevo Checkpoint` / `Editar` / `Eliminar`), la **`TableView`** con cinco columnas (`PropertyValueFactory`) y un **pie** con contador de registros.
 
 ## Lógica del CRUD y Persistencia
 
@@ -177,16 +163,16 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 
 | Operación | Método JDBC | Detalle |
 |---|---|---|
-| **Create** | `CheckpointDAO.insert(Checkpoint)` | `INSERT` con `RETURN_GENERATED_KEYS`; devuelve el **id real generado** por SQLite (`-1` si el driver no lo reportó), que luego se refleja en la fila de la tabla. |
-| **Read** | `CheckpointDAO.selectAll()` | `SELECT *` sobre la tabla; mapea cada fila a un `Checkpoint` y devuelve una `List` (vacía si no hay registros). Se ejecuta al arranque para poblar la tabla. |
-| **Update** | `CheckpointDAO.update(Checkpoint)` | `UPDATE` por `id`; devuelve la **cantidad de filas afectadas** (`1` si se actualizó, `0` si el id no existe). Si la persistencia falla, la UI se recarga para descartar cambios fantasma. |
-| **Delete** | `CheckpointDAO.delete(long)` | `DELETE` por `id`; devuelve `boolean` (`true` si eliminó alguna fila). Requiere confirmación previa y sólo se remueve la fila de la UI cuando la BD confirmó el borrado. |
+| **Create** | `CheckpointDAO.insert(Checkpoint)` | `INSERT` con `RETURN_GENERATED_KEYS`; devuelve el **id generado** (`-1` si el driver no lo reportó). |
+| **Read** | `CheckpointDAO.selectAll()` | `SELECT *`; devuelve `List<Checkpoint>` (vacía si no hay registros). Se ejecuta al arranque. |
+| **Update** | `CheckpointDAO.update(Checkpoint)` | `UPDATE` por `id`; devuelve **filas afectadas** (`1` o `0`). Si falla, la UI se recarga para revertir. |
+| **Delete** | `CheckpointDAO.delete(long)` | `DELETE` por `id`; devuelve `boolean`. Solo se remueve de la UI si la BD confirmó el borrado. |
 
 Todas las operaciones:
 
 - Usan `PreparedStatement` con parámetros bindeados — **no concatenación de strings** — mitigando inyección SQL.
 - Cierran recursos con `try-with-resources` (Connection, Statement, ResultSet).
-- Propaguan `SQLException` a la capa de presentación, que la reporta vía `AlertUtils.showError` y la registra con `java.util.logging.Logger`.
+- Propagan `SQLException` a la capa de presentación, que la reporta vía `AlertUtils.showError` y la registra con `java.util.logging.Logger`.
 
 ### Validaciones de Datos
 
@@ -200,7 +186,7 @@ La validación ocurre en `CheckpointDialog` al confirmar (`validateAndCreate`):
 | **Longitud** | Decimal en el rango `[-180, 180]`. | `La longitud debe estar entre -180.0 y 180.0.` |
 | **Coordenadas** | Parsing numérico con coma o punto (`replace(',', '.')`); si falla, se informa formato inválido. | `Latitud y Longitud deben ser valores numéricos decimales.` |
 
-Adicionalmente, la **entrada se restringe en tiempo real** con `TextFormatter`:
+La **entrada se restringe en tiempo real** con `TextFormatter` (el rango se valida al guardar):
 
 ```java
 // Permite un decimal: signo opcional, dígitos, y un separador , o . con
@@ -227,7 +213,6 @@ El patrón decimal **no limita la cantidad de dígitos ni el rango**; el rango s
 ### Pasos para Clonar
 
 ```bash
-# 1. Clonar el repositorio
 git clone https://github.com/TesinaTrekking/bitacora.git
 cd bitacora
 ```
