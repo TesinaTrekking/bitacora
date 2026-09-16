@@ -17,22 +17,25 @@ Java 17 / JavaFX 21 / SQLite — proyecto Maven de módulo único. Clase princip
 
 **Base package** `com.bitacora.trekking` con subpaquetes organizados:
 
-| Archivo | Paquete | Rol |
+| Archivo | Paquete / Ruta | Rol |
 |---|---|---|
 | `App.java` | raíz | Entry point. Delega en `MainController`. |
 | `MainController.java` | `controller` | Ventana principal: UI programática (sin FXML), carga de datos, acciones CRUD. |
-| `CheckpointDialog.java` | `controller` | Diálogo modal de creación/edición con validación. |
+| `CheckpointDialog.java` | `controller` | Diálogo modal de creación/edición con validación inline y banner de error. |
 | `Checkpoint.java` | `model` | Modelo con propiedades observables de JavaFX (`LongProperty`, `StringProperty`, etc.). |
 | `CheckpointDAO.java` | `dao` | CRUD contra SQLite vía JDBC. |
 | `DatabaseManager.java` | `dao` | Factory de conexiones + inicialización de esquema. |
-| `AlertUtils.java` | `util` | Alertas modales compartidas (`showError` / `showWarning`). |
+| `AlertUtils.java` | `util` | Alertas modales compartidas (`showError` / `showWarning`) y aplicación del tema CSS. |
+| `styles.css` | `resources/css` | Hoja de estilos CSS: tema claro outdoor, jerarquía semántica y validación inline. |
 
 ## Convenciones clave
 
 - Toda la UI se construye en código — no existen archivos FXML.
 - Nombres de variables, clases y paquetes en español (el dominio es español).
 - Modelo con propiedades JavaFX, no POJOs simples — siempre incluir métodos `*Property()` junto a getters/setters.
-- Diálogos de formulario: `GridPane` de dos columnas (etiqueta | campo), `hgap`/`vgap = 10`, padding `10`. Enter = confirmar, Escape = cancelar.
+- Estilos visuales centralizados en `src/main/resources/css/styles.css`, aplicados a la escena y diálogos vía `AlertUtils.applyTheme()`.
+- Diálogos de formulario: `GridPane` de dos columnas (etiqueta | campo), feedback de validación inline consumiendo el evento para no cerrar la ventana ante datos inválidos. Enter = confirmar, Escape = cancelar.
+- Jerarquía semántica de botones: verde primario (`.btn-primary`), neutro secundario (`.btn-secondary`) y rojo peligro (`.btn-danger`).
 - Acciones guiadas por selección (Editar/Eliminar): mantener `disableProperty().bind(selectionModel().selectedItemProperty().isNull())`.
 - Toda eliminación pide confirmación (`Alert.AlertType.CONFIRMATION`) antes de tocar SQLite.
 - Errores se registran con `java.util.logging.Logger` (no `printStackTrace()` ni `catch` vacíos).

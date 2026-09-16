@@ -92,59 +92,64 @@ bitacora/
 ├── .gitignore
 ├── AGENTS.md
 ├── pom.xml
-└── src/main/java/com/bitacora/trekking/
-    ├── App.java                              # Entry point JavaFX
-    ├── controller/
-    │   ├── MainController.java               # Ventana principal
-    │   └── CheckpointDialog.java             # Diálogo crear/editar
-    ├── dao/
-    │   ├── CheckpointDAO.java                # Operaciones CRUD
-    │   └── DatabaseManager.java              # Conexión + esquema
-    ├── model/
-    │   └── Checkpoint.java                   # Entidad observable
-    └── util/
-        └── AlertUtils.java                   # Alertas modales
+└── src/
+    └── main/
+        ├── java/com/bitacora/trekking/
+        │   ├── App.java                              # Entry point JavaFX
+        │   ├── controller/
+        │   │   ├── MainController.java               # Ventana principal
+        │   │   └── CheckpointDialog.java             # Diálogo crear/editar con validación inline
+        │   ├── dao/
+        │   │   ├── CheckpointDAO.java                # Operaciones CRUD
+        │   │   └── DatabaseManager.java              # Conexión + esquema
+        │   ├── model/
+        │   │   └── Checkpoint.java                   # Entidad observable
+        │   └── util/
+        │       └── AlertUtils.java                   # Alertas modales y aplicación de tema CSS
+        └── resources/
+            └── css/
+                └── styles.css                        # Hoja de estilos (tema claro outdoor trekking)
 ```
 
 ### Patrón de Conexión por Operación
 
 `CheckpointDAO` abre una **nueva `Connection` por operación** (sin pooling). Aceptable para este tamaño de app; documentado para una eventual migración a pooling.
 
-## Metodología y Decisiones de UI/UX (Baja Fidelidad)
+## Metodología y Decisiones de UI/UX
 
-### Filosofía del Prototipo
+### Sistema Visual Outdoor y Filosofía de Diseño
 
-El prototipo concentra el esfuerzo en tres ejes funcionales por encima de lo visual:
+La interfaz evoluciona la experiencia de usuario mediante un **tema claro inspirado en trekking y actividades outdoor** (`src/main/resources/css/styles.css`), balanceando una estética limpia y profesional con los requerimientos académicos del proyecto (cero dependencias externas adicionales):
 
-1. **Usabilidad**: flujo intuitivo y consistentemente accesible.
-2. **Flujo lógico**: orden de acciones claro (seleccionar → editar/eliminar; completar formulario → confirmar).
-3. **Funcionalidad CRUD completa**: cada operación es observable y verificable en la tabla y en la base de datos.
-
-No se utilizan CSS ni paletas de colores: la aplicación conserva el **tema Modena** de JavaFX, priorizando la lógica por sobre la estética.
+- **Paleta inspirada en la naturaleza**: Acentos en verde bosque (`#2D6A4F`, `#1B4332`), fondos limpios en gris tenue (`#F8FAF9`), tarjetas blancas (`#FFFFFF`) y bordes suaves (`#E2E8F0`).
+- **Jerarquía y legibilidad**: Tipografía moderna del sistema para etiquetas y controles, combinada con fuentes monoespaciadas para coordenadas técnicas.
+- **Feedback inmediato y no invasivo**: Validación inline que guía al usuario directamente en el formulario sin interrumpir el flujo con ventanas emergentes.
 
 ### Reglas de UX Aplicadas
 
 | Regla | Implementación |
 |---|---|
-| **Alineación en grid** | Los formularios usan `GridPane` de dos columnas (etiqueta \| campo) con alineación consistente. |
-| **Espaciado uniforme** | `hgap`/`vgap = 10` entre celdas del grid y `padding` de `10` en el diálogo; la ventana principal usa `VBox` con espaciado de `15` y `Insets` de `15`. |
+| **Alineación en grid** | Los formularios usan `GridPane` de dos columnas (etiqueta \| campo) con espaciado de `12px` y alineación consistente. |
+| **Espaciado uniforme** | La ventana principal usa `VBox` con espaciado de `14px` e `Insets` de `14px`; la barra superior actúa como tarjeta blanca con padding y bordes redondeados. |
+| **Jerarquía semántica de botones** | Botón primario verde (`.btn-primary`) para `+ Nuevo Checkpoint`, secundario neutro (`.btn-secondary`) para `Editar` y peligro (`.btn-danger`) en rojo suave para `Eliminar`. |
 | **Botón principal por defecto** | El botón de confirmación responde a **Enter** (`setDefaultButton(true)`). |
 | **Cancelación con Escape** | El botón Cancelar responde a **Escape** (`setCancelButton(true)`). |
 | **Estados deshabilitados según selección** | Editar y Eliminar se deshabilitan en ausencia de selección mediante `disableProperty().bind(selectionModel().selectedItemProperty().isNull())`. |
-| **Búsqueda/filtro en vivo** | Un `TextField` filtra la tabla al instante por nombre, hora o descripción (sin distinguir mayúsculas) mediante un `FilteredList` que envuelve la lista persistida; texto vacío muestra todos los registros. |
-| **Contador de registros** | Un `Label` en el pie refleja el total de checkpoints y, cuando hay filtro activo, el desglose "Mostrando X de N", actualizado con `ListChangeListener`. |
+| **Búsqueda/filtro en vivo con botón '✕'** | Un `TextField` filtra la tabla al instante por nombre, hora o descripción mediante `FilteredList`. Incluye un botón interactivo `✕` a la derecha que aparece solo cuando hay texto y permite limpiarlo de un toque. |
+| **Coordenadas técnicas monoespaciadas** | Las columnas de Latitud y Longitud utilizan tipografía monoespaciada alineada a la derecha (`.coordinate-cell`), garantizando una alineación decimal ordenada y limpia. |
+| **Contador de registros** | Un badge estilizado (`.counter-badge`) en el pie refleja el total de checkpoints y, cuando hay filtro activo, el desglose "Mostrando X de N", actualizado con `ListChangeListener`. |
 | **Doble clic para editar** | Un `TableRow` personalizado abre el diálogo de edición al hacer doble clic sobre una fila. |
-| **Menú contextual** | Clic derecho sobre una fila ofrece "Editar" y "Eliminar", operando sobre el checkpoint de la fila bajo el cursor (no sobre la selección actual). |
+| **Menú contextual** | Clic derecho sobre una fila ofrece "Editar" y "Eliminar", operando sobre el checkpoint de la fila bajo el cursor (no sobre la selección previa). |
 | **Atajos de teclado** | `Ctrl+N` crea, `Ctrl+E` edita la fila seleccionada y `Delete` la elimina (con confirmación), vía *accelerators* de la `Scene`. |
-| **Confirmación explícita** | Toda acción destructiva (eliminar) pide confirmación con `Alert.AlertType.CONFIRMATION` antes de tocar SQLite. |
-| **Feedback modal** | Los errores de BD y validación se reportan con alertas modales (`AlertUtils`), bloqueando la ventana mientras están abiertas. |
-| **Foco inicial y aislamiento del texto** | El diálogo enfoca el primer campo al abrir (`requestFocus`); en modo edición selecciona todo el nombre para sobrescribirlo de un toque. |
-| **Retroalimentación del alta** | El checkpoint recién creado queda seleccionado y visible en la tabla. La tabla vacía muestra un `placeholder` orientativo. |
+| **Confirmación explícita** | Toda acción destructiva (eliminar) pide confirmación con diálogo modal estilizado antes de tocar SQLite. |
+| **Feedback de validación inline** | En lugar de alertas modales que interrumpen la edición, los errores del formulario se informan con un banner superior en el diálogo y un borde rojo (`.field-error`) sobre el campo observado, conservando el foco para corregirlo inmediatamente. |
+| **Foco inicial y reactividad** | El diálogo enfoca el primer campo al abrir (`requestFocus`) y selecciona el nombre en edición. Al tipear en un campo con error, el feedback visual se limpia de inmediato. |
+| **Retroalimentación del alta** | El checkpoint recién creado queda seleccionado y visible en la tabla. La tabla vacía muestra un `placeholder` orientativo estilizado. |
 | **Pre-información del formulario** | `TextArea` para descripción con 3 filas predefinidas; `promptText` en cada campo con ejemplos reales (p. ej. `Ej. 14:30`). |
 
 ### Composición de la Ventana Principal
 
-La ventana principal (`1050×600`, mín. `800×500`) se estructura como un `VBox` con una **barra superior** (título, espaciador, filtro, botones `+ Nuevo Checkpoint` / `Editar` / `Eliminar`), la **`TableView`** con cinco columnas (`PropertyValueFactory`) y un **pie** con contador de registros.
+La ventana principal (`1080×640`, mín. `850×520`) se estructura como un `VBox` con una **barra superior unificada** (identidad de marca con icono de montaña y subtítulo, espaciador elástico, buscador interactivo con botón de limpieza y botones de acción semánticos), la **`TableView`** con cinco columnas estilizadas y un **pie** con el badge contador de registros.
 
 ## Lógica del CRUD y Persistencia
 
@@ -176,7 +181,7 @@ Todas las operaciones:
 
 ### Validaciones de Datos
 
-La validación ocurre en `CheckpointDialog` al confirmar (`validateAndCreate`):
+La validación ocurre en `CheckpointDialog` al confirmar (`validateInput`), interceptando la acción mediante un filtro de eventos (`addEventFilter(ActionEvent.ACTION, ...)`). Si algún dato es inválido, se consume el evento (`event.consume()`), impidiendo el cierre del diálogo y desplegando el banner de error superior junto al resaltado (`.field-error`) del campo problemático:
 
 | Campo | Regla | Mensaje |
 |---|---|---|

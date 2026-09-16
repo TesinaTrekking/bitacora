@@ -3,8 +3,10 @@ package com.bitacora.trekking.controller;
 import com.bitacora.trekking.model.Checkpoint;
 import com.bitacora.trekking.util.AlertUtils;
 import javafx.application.Platform;
+import javafx.event.ActionEvent;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -16,6 +18,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
@@ -27,10 +30,11 @@ import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
 /**
- * Diálogo modal de creación o edición de un checkpoint.
+ * Diálogo modal de creación o edición de un checkpoint con feedback de validación inline.
  *
  * <p>En modo creación los campos arrancan vacíos; en modo edición se precargan
- * los valores del checkpoint seleccionado. La validación ocurre al confirmar.</p>
+ * los valores del checkpoint seleccionado. La validación ocurre al confirmar,
+ * impidiendo el cierre del diálogo y destacando visualmente los errores.</p>
  */
 public class CheckpointDialog extends Dialog<Checkpoint> {
 
@@ -50,6 +54,10 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
     private final TextField txtLongitud = new TextField();
     private final TextArea txtDescripcion = new TextArea();
 
+    // Componentes de feedback inline
+    private final HBox errorBanner = new HBox(8);
+    private final Label errorText = new Label();
+
     private final Checkpoint existingCheckpoint;
 
     public CheckpointDialog(Window owner, Checkpoint checkpointToEdit) {
@@ -60,34 +68,68 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
         setTitle(checkpointToEdit == null ? "Crear Nuevo Checkpoint" : "Editar Checkpoint");
 
         DialogPane dialogPane = getDialogPane();
+        AlertUtils.applyTheme(this);
+
         configureButtons(dialogPane, checkpointToEdit != null);
         configureForm(dialogPane, checkpointToEdit);
-        configureResultConverter(dialogPane);
+        configureResultConverter();
     }
 
     private void configureButtons(DialogPane dialogPane, boolean isEditing) {
-        // "Cancelar" queda a la izquierda del botón principal por la convención de ButtonData.
         ButtonType confirmar = new ButtonType(isEditing ? "Guardar" : "Confirmar", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancelar = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialogPane.getButtonTypes().addAll(confirmar, cancelar);
 
-        // Enter dispara la acción principal y Escape cierra el diálogo.
         Button btnConfirmar = (Button) dialogPane.lookupButton(confirmar);
         btnConfirmar.setDefaultButton(true);
+        btnConfirmar.getStyleClass().add("btn-primary");
+
+        // Validación inline: intercepta el click y consume el evento si los datos no son válidos,
+        // evitando que el diálogo se cierre.
+        btnConfirmar.addEventFilter(ActionEvent.ACTION, event -> {
+            if (!validateInput()) {
+                event.consume();
+            }
+        });
+
         Button btnCancelar = (Button) dialogPane.lookupButton(cancelar);
         btnCancelar.setCancelButton(true);
+        btnCancelar.getStyleClass().add("btn-secondary");
     }
 
     private void configureForm(DialogPane dialogPane, Checkpoint checkpointToEdit) {
-        Label header = new Label(checkpointToEdit == null ? "Crear Nuevo Checkpoint" : "Editar Checkpoint");
+        boolean isEditing = checkpointToEdit != null;
 
+        // Cabecera estilizada
+        Label titleLabel = new Label(isEditing ? "Editar Checkpoint" : "Nuevo Checkpoint");
+        titleLabel.getStyleClass().add("dialog-header-title");
+
+        Label subtitleLabel = new Label(isEditing
+                ? "Modifique los atributos del punto de control de ruta."
+                : "Ingrese los datos del nuevo punto de control para la bitácora.");
+        subtitleLabel.getStyleClass().add("dialog-header-subtitle");
+
+        VBox headerBox = new VBox(2, titleLabel, subtitleLabel);
+
+        // Banner de error inline (oculto por defecto)
+        Label errorIcon = new Label("⚠️");
+        errorIcon.getStyleClass().add("error-banner-icon");
+        errorText.getStyleClass().add("error-banner-text");
+        errorBanner.setAlignment(Pos.CENTER_LEFT);
+        errorBanner.getStyleClass().add("error-banner");
+        errorBanner.getChildren().addAll(errorIcon, errorText);
+        errorBanner.setVisible(false);
+        errorBanner.setManaged(false);
+
+        // Formulario
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(10));
+        grid.setHgap(12);
+        grid.setVgap(12);
+        grid.getStyleClass().add("dialog-form-card");
 
         ColumnConstraints labelColumn = new ColumnConstraints();
         labelColumn.setHalignment(HPos.LEFT);
+        labelColumn.setMinWidth(140);
         ColumnConstraints fieldColumn = new ColumnConstraints();
         fieldColumn.setHalignment(HPos.LEFT);
         fieldColumn.setHgrow(Priority.ALWAYS);
@@ -99,15 +141,21 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
         txtLongitud.setPromptText("Ej. -64.1810");
         txtDescripcion.setPromptText("Descripción opcional de la parada o control...");
         txtDescripcion.setPrefRowCount(3);
-        txtDescripcion.setPrefColumnCount(20);
+        txtDescripcion.setPrefColumnCount(22);
         GridPane.setFillWidth(txtDescripcion, true);
 
-        // Restringe la entrada; el rango decimal se valida al guardar.
+        // Restringe entrada en vivo
         txtLatitud.setTextFormatter(createDecimalTextFormatter());
         txtLongitud.setTextFormatter(createDecimalTextFormatter());
         txtHora.setTextFormatter(createHoraTextFormatter());
 
-        if (checkpointToEdit != null) {
+        // Listeners reactivos para limpiar el feedback de error al tipear
+        txtNombre.textProperty().addListener((obs, o, n) -> clearFieldError(txtNombre));
+        txtHora.textProperty().addListener((obs, o, n) -> clearFieldError(txtHora));
+        txtLatitud.textProperty().addListener((obs, o, n) -> clearFieldError(txtLatitud));
+        txtLongitud.textProperty().addListener((obs, o, n) -> clearFieldError(txtLongitud));
+
+        if (isEditing) {
             txtNombre.setText(checkpointToEdit.getNombre());
             txtHora.setText(checkpointToEdit.getHora());
             txtLatitud.setText(String.valueOf(checkpointToEdit.getLatitud()));
@@ -117,74 +165,140 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
 
         Platform.runLater(() -> {
             txtNombre.requestFocus();
-            if (checkpointToEdit != null) {
+            if (isEditing) {
                 txtNombre.selectAll();
             }
         });
 
-        grid.addRow(0, new Label("Nombre de Checkpoint"), txtNombre);
-        grid.addRow(1, new Label("Hora"), txtHora);
-        grid.addRow(2, new Label("Latitud"), txtLatitud);
-        grid.addRow(3, new Label("Longitud"), txtLongitud);
-        grid.addRow(4, new Label("Descripción"), txtDescripcion);
+        Label lblNombre = new Label("Nombre");
+        lblNombre.getStyleClass().add("form-label");
+        Label lblHora = new Label("Hora (HH:mm)");
+        lblHora.getStyleClass().add("form-label");
+        Label lblLatitud = new Label("Latitud");
+        lblLatitud.getStyleClass().add("form-label");
+        Label lblLongitud = new Label("Longitud");
+        lblLongitud.getStyleClass().add("form-label");
+        Label lblDescripcion = new Label("Descripción");
+        lblDescripcion.getStyleClass().add("form-label");
 
-        VBox mainLayout = new VBox(10, header, grid);
-        mainLayout.setPadding(new Insets(10));
+        grid.addRow(0, lblNombre, txtNombre);
+        grid.addRow(1, lblHora, txtHora);
+        grid.addRow(2, lblLatitud, txtLatitud);
+        grid.addRow(3, lblLongitud, txtLongitud);
+        grid.addRow(4, lblDescripcion, txtDescripcion);
+
+        VBox mainLayout = new VBox(12, headerBox, errorBanner, grid);
+        mainLayout.setPadding(new Insets(12));
         dialogPane.setContent(mainLayout);
     }
 
-    private void configureResultConverter(DialogPane dialogPane) {
-        setResultConverter(dialogButton ->
-                dialogButton != null && dialogButton.getButtonData() == ButtonBar.ButtonData.OK_DONE
-                        ? validateAndCreate()
-                        : null);
+    private void configureResultConverter() {
+        setResultConverter(dialogButton -> {
+            if (dialogButton != null && dialogButton.getButtonData() == ButtonBar.ButtonData.OK_DONE) {
+                return buildCheckpointFromInputs();
+            }
+            return null;
+        });
     }
 
-    private Checkpoint validateAndCreate() {
+    /**
+     * Valida los campos ingresados y activa el feedback inline si hay inconsistencias.
+     *
+     * @return {@code true} si todos los datos son válidos
+     */
+    private boolean validateInput() {
+        clearAllErrors();
+
+        String nombre = txtNombre.getText().trim();
+        String hora = txtHora.getText().trim();
+        String latitudRaw = txtLatitud.getText().trim();
+        String longitudRaw = txtLongitud.getText().trim();
+
+        if (nombre.isEmpty()) {
+            showInlineError(txtNombre, "Por favor ingrese un nombre para el Checkpoint.");
+            return false;
+        }
+
+        if (hora.isEmpty() || !isHoraValida(hora)) {
+            showInlineError(txtHora, "La hora debe tener el formato HH:mm (Ej. 14:30).");
+            return false;
+        }
+
+        if (!latitudRaw.isEmpty()) {
+            try {
+                double lat = parseDecimal(latitudRaw);
+                if (lat < LAT_MIN || lat > LAT_MAX) {
+                    showInlineError(txtLatitud, "La latitud debe estar entre " + LAT_MIN + " y " + LAT_MAX + ".");
+                    return false;
+                }
+            } catch (NumberFormatException ex) {
+                showInlineError(txtLatitud, "La latitud debe ser un valor numérico decimal.");
+                return false;
+            }
+        }
+
+        if (!longitudRaw.isEmpty()) {
+            try {
+                double lon = parseDecimal(longitudRaw);
+                if (lon < LON_MIN || lon > LON_MAX) {
+                    showInlineError(txtLongitud, "La longitud debe estar entre " + LON_MIN + " y " + LON_MAX + ".");
+                    return false;
+                }
+            } catch (NumberFormatException ex) {
+                showInlineError(txtLongitud, "La longitud debe ser un valor numérico decimal.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Checkpoint buildCheckpointFromInputs() {
         String nombre = txtNombre.getText().trim();
         String hora = txtHora.getText().trim();
         String latitudRaw = txtLatitud.getText().trim();
         String longitudRaw = txtLongitud.getText().trim();
         String descripcion = txtDescripcion.getText().trim();
 
-        if (nombre.isEmpty()) {
-            showAlert("Campo Requerido", "Por favor ingrese un nombre para el Checkpoint.");
-            return null;
-        }
-        if (!isHoraValida(hora)) {
-            showAlert("Formato Inválido", "La hora debe tener el formato HH:mm (Ej. 14:30).");
-            return null;
-        }
-
-        Double latitud = null;
-        Double longitud = null;
-        try {
-            if (!latitudRaw.isEmpty()) {
-                latitud = parseDecimal(latitudRaw);
-            }
-            if (!longitudRaw.isEmpty()) {
-                longitud = parseDecimal(longitudRaw);
-            }
-        } catch (NumberFormatException ex) {
-            showAlert("Formato Inválido", "Latitud y Longitud deben ser valores numéricos decimales.");
-            return null;
-        }
-        if (latitud != null && (latitud < LAT_MIN || latitud > LAT_MAX)) {
-            showAlert("Valor Fuera de Rango",
-                    "La latitud debe estar entre " + LAT_MIN + " y " + LAT_MAX + ".");
-            return null;
-        }
-        if (longitud != null && (longitud < LON_MIN || longitud > LON_MAX)) {
-            showAlert("Valor Fuera de Rango",
-                    "La longitud debe estar entre " + LON_MIN + " y " + LON_MAX + ".");
-            return null;
-        }
+        double latitud = latitudRaw.isEmpty() ? 0.0 : parseDecimal(latitudRaw);
+        double longitud = longitudRaw.isEmpty() ? 0.0 : parseDecimal(longitudRaw);
 
         long id = (existingCheckpoint != null) ? existingCheckpoint.getId() : System.currentTimeMillis();
-        return new Checkpoint(id, nombre, hora,
-                (latitud == null) ? 0.0 : latitud,
-                (longitud == null) ? 0.0 : longitud,
-                descripcion);
+        return new Checkpoint(id, nombre, hora, latitud, longitud, descripcion);
+    }
+
+    private void showInlineError(TextField field, String message) {
+        errorText.setText(message);
+        errorBanner.setVisible(true);
+        errorBanner.setManaged(true);
+        if (field != null) {
+            if (!field.getStyleClass().contains("field-error")) {
+                field.getStyleClass().add("field-error");
+            }
+            field.requestFocus();
+        }
+    }
+
+    private void clearFieldError(TextField field) {
+        if (field != null) {
+            field.getStyleClass().remove("field-error");
+        }
+        if (!txtNombre.getStyleClass().contains("field-error")
+                && !txtHora.getStyleClass().contains("field-error")
+                && !txtLatitud.getStyleClass().contains("field-error")
+                && !txtLongitud.getStyleClass().contains("field-error")) {
+            errorBanner.setVisible(false);
+            errorBanner.setManaged(false);
+        }
+    }
+
+    private void clearAllErrors() {
+        txtNombre.getStyleClass().remove("field-error");
+        txtHora.getStyleClass().remove("field-error");
+        txtLatitud.getStyleClass().remove("field-error");
+        txtLongitud.getStyleClass().remove("field-error");
+        errorBanner.setVisible(false);
+        errorBanner.setManaged(false);
     }
 
     private static boolean isHoraValida(String hora) {
@@ -200,10 +314,6 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
         return Double.parseDouble(raw.replace(',', '.'));
     }
 
-    /**
-     * Restringe la entrada a un número decimal (signo opcional, dígitos y un único
-     * separador coma o punto) sin limitar la cantidad de dígitos ni el rango.
-     */
     private static TextFormatter<String> createDecimalTextFormatter() {
         return new TextFormatter<>(change -> {
             String newText = change.getControlNewText();
@@ -211,17 +321,10 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
         });
     }
 
-    /**
-     * Restringe la entrada a un formato HH:mm (dígitos y un único ':').
-     */
     private static TextFormatter<String> createHoraTextFormatter() {
         return new TextFormatter<>(change -> {
             String newText = change.getControlNewText();
             return newText.isEmpty() || newText.matches(HORA_PATTERN) ? change : null;
         });
-    }
-
-    private void showAlert(String title, String message) {
-        AlertUtils.showWarning(getOwner(), title, message);
     }
 }

@@ -31,11 +31,12 @@ import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.net.URL;
 import java.sql.SQLException;
 import java.util.Locale;
 import java.util.Optional;
@@ -45,13 +46,13 @@ import java.util.logging.Logger;
 
 /**
  * Controlador de la ventana principal: construye la interfaz, carga los datos
- * y orquesta las acciones de crear, editar y eliminar checkpoints.
+ * y orquesta las acciones de crear, editar y eliminar checkpoints con tema visual outdoor.
  */
 public class MainController {
 
     private static final Logger LOGGER = Logger.getLogger(MainController.class.getName());
-    private static final double SCENE_WIDTH = 1050.0;
-    private static final double SCENE_HEIGHT = 600.0;
+    private static final double SCENE_WIDTH = 1080.0;
+    private static final double SCENE_HEIGHT = 640.0;
 
     private final CheckpointDAO checkpointDAO = new CheckpointDAO();
     private final ObservableList<Checkpoint> checkpointList = FXCollections.observableArrayList();
@@ -78,10 +79,10 @@ public class MainController {
             return false;
         }
 
-        primaryStage.setTitle("Gestión de Ruta - Bitácora (Conectado a SQLite)");
+        primaryStage.setTitle("Bitácora de Trekking - Gestión de Checkpoints");
         primaryStage.setScene(buildScene());
-        primaryStage.setMinWidth(800);
-        primaryStage.setMinHeight(500);
+        primaryStage.setMinWidth(850);
+        primaryStage.setMinHeight(520);
         primaryStage.show();
         return true;
     }
@@ -91,60 +92,102 @@ public class MainController {
         // de acción a la selección actual.
         tableView = new TableView<>(filteredList);
         tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        tableView.setPlaceholder(new Label("No hay checkpoints registrados. Use \"+ Nuevo Checkpoint\" para agregar uno."));
+        Label placeholderLabel = new Label("No hay checkpoints registrados. Use \"+ Nuevo Checkpoint\" para agregar uno.");
+        placeholderLabel.getStyleClass().add("table-placeholder");
+        tableView.setPlaceholder(placeholderLabel);
         configureColumns();
         configureRowInteractions();
 
-        VBox mainLayout = new VBox(15, buildTopBar(), tableView, buildFooter());
-        mainLayout.setPadding(new Insets(15));
+        VBox mainLayout = new VBox(14, buildTopBar(), tableView, buildFooter());
+        mainLayout.setPadding(new Insets(14));
         VBox.setVgrow(tableView, Priority.ALWAYS);
 
         Scene scene = new Scene(mainLayout, SCENE_WIDTH, SCENE_HEIGHT);
+        applyStylesheet(scene);
         configureShortcuts(scene);
         return scene;
     }
 
-    private HBox buildTopBar() {
-        Label titleLabel = new Label("Bitácora");
+    private void applyStylesheet(Scene scene) {
+        URL cssUrl = getClass().getResource("/css/styles.css");
+        if (cssUrl != null) {
+            scene.getStylesheets().add(cssUrl.toExternalForm());
+        }
+    }
 
+    private HBox buildTopBar() {
+        // Identidad y branding
+        Label brandIcon = new Label("🏔️");
+        brandIcon.getStyleClass().add("brand-icon");
+
+        Label brandTitle = new Label("Bitácora de Trekking");
+        brandTitle.getStyleClass().add("brand-title");
+
+        Label brandSubtitle = new Label("Puntos de control de ruta");
+        brandSubtitle.getStyleClass().add("brand-subtitle");
+
+        VBox brandBox = new VBox(1, brandTitle, brandSubtitle);
+        HBox brandContainer = new HBox(8, brandIcon, brandBox);
+        brandContainer.setAlignment(Pos.CENTER_LEFT);
+
+        // Buscador con botón interactivo de limpieza
         TextField filterField = new TextField();
         filterField.setPromptText("Filtrar por nombre, hora o descripción…");
-        filterField.setPrefWidth(240);
+        filterField.setPrefWidth(260);
+        filterField.getStyleClass().add("search-field");
         filterField.textProperty().addListener((obs, oldValue, newValue) ->
                 filteredList.setPredicate(createFilterPredicate(newValue)));
 
+        Button clearButton = new Button("✕");
+        clearButton.getStyleClass().add("clear-search-button");
+        clearButton.visibleProperty().bind(filterField.textProperty().isNotEmpty());
+        clearButton.setOnAction(event -> filterField.clear());
+
+        StackPane searchContainer = new StackPane(filterField, clearButton);
+        StackPane.setAlignment(clearButton, Pos.CENTER_RIGHT);
+        searchContainer.getStyleClass().add("search-container");
+
+        // Botones de acción con jerarquía semántica
         Button newButton = new Button("+ Nuevo Checkpoint");
+        newButton.getStyleClass().add("btn-primary");
         newButton.setOnAction(event -> showCreateDialog());
 
         // Editar/Eliminar actúan sobre la fila seleccionada: se deshabilitan sin selección.
         Button editButton = new Button("Editar");
+        editButton.getStyleClass().add("btn-secondary");
         editButton.disableProperty().bind(tableView.getSelectionModel().selectedItemProperty().isNull());
         editButton.setOnAction(event -> editSelected());
 
         Button deleteButton = new Button("Eliminar");
+        deleteButton.getStyleClass().add("btn-danger");
         deleteButton.disableProperty().bind(tableView.getSelectionModel().selectedItemProperty().isNull());
         deleteButton.setOnAction(event -> deleteSelected());
+
+        HBox actionsContainer = new HBox(8, newButton, editButton, deleteButton);
+        actionsContainer.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox topBar = new HBox(15, titleLabel, spacer, filterField, newButton, editButton, deleteButton);
+        HBox topBar = new HBox(16, brandContainer, spacer, searchContainer, actionsContainer);
+        topBar.getStyleClass().add("top-bar");
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(15, 20, 15, 20));
         return topBar;
     }
 
     private HBox buildFooter() {
         counterLabel = new Label();
+        counterLabel.getStyleClass().add("counter-badge");
         updateCounter();
+
         // El contador refleja tanto el total persistido como la cantidad visible
         // tras aplicar el filtro de texto (desambiguar "Mostrando X de Y").
         checkpointList.addListener((ListChangeListener<Checkpoint>) change -> updateCounter());
         filteredList.addListener((ListChangeListener<Checkpoint>) change -> updateCounter());
 
         HBox footer = new HBox(counterLabel);
+        footer.getStyleClass().add("footer-container");
         footer.setAlignment(Pos.CENTER_LEFT);
-        footer.setPadding(new Insets(0, 20, 0, 20));
         return footer;
     }
 
@@ -234,20 +277,35 @@ public class MainController {
     private void configureColumns() {
         TableColumn<Checkpoint, String> horaColumn = new TableColumn<>("Hora");
         horaColumn.setCellValueFactory(new PropertyValueFactory<>("hora"));
-        horaColumn.setPrefWidth(80);
+        horaColumn.setPrefWidth(85);
+        horaColumn.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText("");
+                    getStyleClass().remove("hora-cell");
+                } else {
+                    setText(item);
+                    if (!getStyleClass().contains("hora-cell")) {
+                        getStyleClass().add("hora-cell");
+                    }
+                }
+            }
+        });
 
         TableColumn<Checkpoint, String> nombreColumn = new TableColumn<>("Checkpoint / Nombre");
         nombreColumn.setCellValueFactory(new PropertyValueFactory<>("nombre"));
-        nombreColumn.setPrefWidth(230);
+        nombreColumn.setPrefWidth(240);
 
         TableColumn<Checkpoint, Number> latitudColumn = new TableColumn<>("Latitud");
         latitudColumn.setCellValueFactory(new PropertyValueFactory<>("latitud"));
-        latitudColumn.setPrefWidth(110);
+        latitudColumn.setPrefWidth(120);
         setNumericCellFactory(latitudColumn);
 
         TableColumn<Checkpoint, Number> longitudColumn = new TableColumn<>("Longitud");
         longitudColumn.setCellValueFactory(new PropertyValueFactory<>("longitud"));
-        longitudColumn.setPrefWidth(110);
+        longitudColumn.setPrefWidth(120);
         setNumericCellFactory(longitudColumn);
 
         TableColumn<Checkpoint, String> descripcionColumn = new TableColumn<>("Descripción");
@@ -257,16 +315,23 @@ public class MainController {
     }
 
     /**
-     * Las columnas numéricas de coordenadas se alinean a la derecha y recortan
-     * los decimales redundantes para una lectura más limpia.
+     * Las columnas numéricas de coordenadas se alinean a la derecha, usan tipografía
+     * monoespaciada mediante CSS y recortan decimales redundantes para una lectura técnica limpia.
      */
     private static void setNumericCellFactory(TableColumn<Checkpoint, Number> column) {
         column.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(Number value, boolean empty) {
                 super.updateItem(value, empty);
-                setText(empty || value == null ? "" : formatCoordinate(value.doubleValue()));
-                setAlignment(Pos.CENTER_RIGHT);
+                if (empty || value == null) {
+                    setText("");
+                    getStyleClass().remove("coordinate-cell");
+                } else {
+                    setText(formatCoordinate(value.doubleValue()));
+                    if (!getStyleClass().contains("coordinate-cell")) {
+                        getStyleClass().add("coordinate-cell");
+                    }
+                }
             }
         });
     }
@@ -318,15 +383,10 @@ public class MainController {
                 long newId = checkpointDAO.insert(newCheckpoint);
                 if (newId != -1) {
                     newCheckpoint.setId(newId);
-                    checkpointList.add(newCheckpoint);
-                    // El registro recién creado queda seleccionado y visible para
-                    // confirmar visualmente el alta.
-                    tableView.getSelectionModel().select(newCheckpoint);
-                    tableView.scrollTo(newCheckpoint);
-                } else {
-                    AlertUtils.showError(primaryStage, "Error al guardar",
-                            "No se pudo guardar el checkpoint en la base de datos.");
                 }
+                checkpointList.add(newCheckpoint);
+                tableView.getSelectionModel().select(newCheckpoint);
+                tableView.scrollTo(newCheckpoint);
             } catch (SQLException e) {
                 LOGGER.log(Level.SEVERE, "Error al insertar checkpoint", e);
                 AlertUtils.showError(primaryStage, "Error al guardar",
@@ -370,6 +430,16 @@ public class MainController {
         ButtonType confirmDelete = new ButtonType("Eliminar", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancel = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(confirmDelete, cancel);
+        AlertUtils.applyTheme(alert);
+
+        Button btnEliminar = (Button) alert.getDialogPane().lookupButton(confirmDelete);
+        if (btnEliminar != null) {
+            btnEliminar.getStyleClass().add("btn-danger");
+        }
+        Button btnCancelar = (Button) alert.getDialogPane().lookupButton(cancel);
+        if (btnCancelar != null) {
+            btnCancelar.getStyleClass().add("btn-secondary");
+        }
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == confirmDelete) {
