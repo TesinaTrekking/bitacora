@@ -27,6 +27,7 @@ Java 17 / JavaFX 21 / SQLite — proyecto Maven de módulo único. Clase princip
 | `DatabaseManager.java` | `dao` | Factory de conexiones + inicialización de esquema. |
 | `AlertUtils.java` | `util` | Alertas modales compartidas (`showError` / `showWarning`) y aplicación del tema CSS. |
 | `styles.css` | `resources/css` | Hoja de estilos CSS: tema claro outdoor, jerarquía semántica y validación inline. |
+| `diagrama_entidad_relacion.md` | `docs` | Diagrama entidad-relación (Mermaid), esquema SQLite y diccionario de datos. |
 
 ## Convenciones clave
 

@@ -92,6 +92,8 @@ bitacora/
 ├── .gitignore
 ├── AGENTS.md
 ├── pom.xml
+├── docs/
+│   └── diagrama_entidad_relacion.md          # Modelo entidad-relación y diccionario de datos
 └── src/
     └── main/
         ├── java/com/bitacora/trekking/
@@ -153,7 +155,7 @@ La ventana principal (`1080×640`, mín. `850×520`) se estructura como un `VBox
 
 ## Lógica del CRUD y Persistencia
 
-La entidad persistida es la tabla `checkpoints`, cuyo esquema se define en `DatabaseManager`:
+La entidad persistida es la tabla `checkpoints`, cuyo esquema se define en `DatabaseManager`. Para un análisis detallado del modelo conceptual, relaciones y diccionario de datos, consultar [docs/diagrama_entidad_relacion.md](docs/diagrama_entidad_relacion.md).
 
 ```sql
 CREATE TABLE IF NOT EXISTS checkpoints (
