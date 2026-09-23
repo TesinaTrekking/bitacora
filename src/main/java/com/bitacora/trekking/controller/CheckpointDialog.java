@@ -224,30 +224,37 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
             return false;
         }
 
-        if (!latitudRaw.isEmpty()) {
-            try {
-                double lat = parseDecimal(latitudRaw);
-                if (lat < LAT_MIN || lat > LAT_MAX) {
-                    showInlineError(txtLatitud, "La latitud debe estar entre " + LAT_MIN + " y " + LAT_MAX + ".");
-                    return false;
-                }
-            } catch (NumberFormatException ex) {
-                showInlineError(txtLatitud, "La latitud debe ser un valor numérico decimal.");
+        // Las coordenadas son obligatorias: un campo vacío no debe caer en un
+        // default 0.0/0.0 ("Null Island") porque SQLite lo aceptaría como
+        // dato válido al ser la columna REAL NOT NULL.
+        if (latitudRaw.isEmpty()) {
+            showInlineError(txtLatitud, "Por favor ingrese la latitud del Checkpoint.");
+            return false;
+        }
+        try {
+            double lat = parseDecimal(latitudRaw);
+            if (lat < LAT_MIN || lat > LAT_MAX) {
+                showInlineError(txtLatitud, "La latitud debe estar entre " + LAT_MIN + " y " + LAT_MAX + ".");
                 return false;
             }
+        } catch (NumberFormatException ex) {
+            showInlineError(txtLatitud, "La latitud debe ser un valor numérico decimal.");
+            return false;
         }
 
-        if (!longitudRaw.isEmpty()) {
-            try {
-                double lon = parseDecimal(longitudRaw);
-                if (lon < LON_MIN || lon > LON_MAX) {
-                    showInlineError(txtLongitud, "La longitud debe estar entre " + LON_MIN + " y " + LON_MAX + ".");
-                    return false;
-                }
-            } catch (NumberFormatException ex) {
-                showInlineError(txtLongitud, "La longitud debe ser un valor numérico decimal.");
+        if (longitudRaw.isEmpty()) {
+            showInlineError(txtLongitud, "Por favor ingrese la longitud del Checkpoint.");
+            return false;
+        }
+        try {
+            double lon = parseDecimal(longitudRaw);
+            if (lon < LON_MIN || lon > LON_MAX) {
+                showInlineError(txtLongitud, "La longitud debe estar entre " + LON_MIN + " y " + LON_MAX + ".");
                 return false;
             }
+        } catch (NumberFormatException ex) {
+            showInlineError(txtLongitud, "La longitud debe ser un valor numérico decimal.");
+            return false;
         }
 
         return true;
@@ -260,8 +267,12 @@ public class CheckpointDialog extends Dialog<Checkpoint> {
         String longitudRaw = txtLongitud.getText().trim();
         String descripcion = txtDescripcion.getText().trim();
 
-        double latitud = latitudRaw.isEmpty() ? 0.0 : parseDecimal(latitudRaw);
-        double longitud = longitudRaw.isEmpty() ? 0.0 : parseDecimal(longitudRaw);
+        // Sin default para coordenadas: validateInput() garantiza que ambos
+        // campos no estén vacíos y sean parseables (el result converter solo
+        // se ejecuta si el event filter no consumió el evento), por lo que un
+        // vacío aquí sería un error de programación, no un 0.0 silencioso.
+        double latitud = parseDecimal(latitudRaw);
+        double longitud = parseDecimal(longitudRaw);
 
         long id = (existingCheckpoint != null) ? existingCheckpoint.getId() : System.currentTimeMillis();
         return new Checkpoint(id, nombre, hora, latitud, longitud, descripcion);

@@ -138,6 +138,7 @@ La interfaz evoluciona la experiencia de usuario mediante un **tema claro inspir
 | **Cancelación con Escape** | El botón Cancelar responde a **Escape** (`setCancelButton(true)`). |
 | **Estados deshabilitados según selección** | Editar y Eliminar se deshabilitan en ausencia de selección mediante `disableProperty().bind(selectionModel().selectedItemProperty().isNull())`. |
 | **Búsqueda/filtro en vivo con botón '✕'** | Un `TextField` filtra la tabla al instante por nombre, hora o descripción mediante `FilteredList`. Incluye un botón interactivo `✕` a la derecha que aparece solo cuando hay texto y permite limpiarlo de un toque. |
+| **Orden por columnas asc/desc** | Clic en el encabezado alterna ascendente/descendente. La tabla se alimenta de un `SortedList` con el comparador enlazado al de la `TableView` (capa `FilteredList → SortedList`), de modo que el orden se reaplica solo ante cambios de filtro o de datos y la flecha refleja el orden real. |
 | **Coordenadas técnicas monoespaciadas** | Las columnas de Latitud y Longitud utilizan tipografía monoespaciada alineada a la derecha (`.coordinate-cell`), garantizando una alineación decimal ordenada y limpia. |
 | **Contador de registros** | Un badge estilizado (`.counter-badge`) en el pie refleja el total de checkpoints y, cuando hay filtro activo, el desglose "Mostrando X de N", actualizado con `ListChangeListener`. |
 | **Doble clic para editar** | Un `TableRow` personalizado abre el diálogo de edición al hacer doble clic sobre una fila. |
@@ -189,8 +190,8 @@ La validación ocurre en `CheckpointDialog` al confirmar (`validateInput`), inte
 |---|---|---|
 | **Nombre** | Obligatorio (no vacío tras `trim()`). | `Por favor ingrese un nombre para el Checkpoint.` |
 | **Hora** | Formato `HH:mm` validado con `LocalTime.parse` + `DateTimeFormatter`. | `La hora debe tener el formato HH:mm (Ej. 14:30).` |
-| **Latitud** | Decimal en el rango `[-90, 90]`. | `La latitud debe estar entre -90.0 y 90.0.` |
-| **Longitud** | Decimal en el rango `[-180, 180]`. | `La longitud debe estar entre -180.0 y 180.0.` |
+| **Latitud** | **Obligatorio** (no vacío tras `trim()`) + decimal en el rango `[-90, 90]`. | `Por favor ingrese la latitud del Checkpoint.` / `La latitud debe estar entre -90.0 y 90.0.` |
+| **Longitud** | **Obligatorio** (no vacío tras `trim()`) + decimal en el rango `[-180, 180]`. | `Por favor ingrese la longitud del Checkpoint.` / `La longitud debe estar entre -180.0 y 180.0.` |
 | **Coordenadas** | Parsing numérico con coma o punto (`replace(',', '.')`); si falla, se informa formato inválido. | `Latitud y Longitud deben ser valores numéricos decimales.` |
 
 La **entrada se restringe en tiempo real** con `TextFormatter` (el rango se valida al guardar):

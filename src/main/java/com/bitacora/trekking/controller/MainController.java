@@ -9,6 +9,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -62,6 +63,12 @@ public class MainController {
   // que cumple el filtro de texto, sin modificar la lista persistida.
   private final FilteredList<Checkpoint> filteredList = new FilteredList<>(checkpointList, checkpoint -> true);
 
+  // Capa de orden sobre el filtro: con el comparador enlazado al de la tabla,
+  // el orden activo se reaplica solo cuando cambia el filtro o los datos.
+  // Sin esta capa, el sort policy por defecto de JavaFX intenta ordenar el
+  // FilteredList en el lugar y falla silenciosamente (UnsupportedOperationException).
+  private final SortedList<Checkpoint> sortedList = new SortedList<>(filteredList);
+
   private TableView<Checkpoint> tableView;
   private Stage primaryStage;
   private Label counterLabel;
@@ -91,7 +98,11 @@ public class MainController {
   private Scene buildScene() {
     // La tabla se crea antes que la barra para enlazar el estado de los botones
     // de acción a la selección actual.
-    tableView = new TableView<>(filteredList);
+    tableView = new TableView<>(sortedList);
+    // Enlaza el orden de las columnas (sortOrder -> comparator) con la capa
+    // ordenada: al clickear una columna, las filas se reordenan y la flecha
+    // refleja el estado real del orden.
+    sortedList.comparatorProperty().bind(tableView.comparatorProperty());
     tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
     Label placeholderLabel = new Label("No hay checkpoints registrados. Use \"+ Nuevo Checkpoint\" para agregar uno.");
     placeholderLabel.getStyleClass().add("table-placeholder");

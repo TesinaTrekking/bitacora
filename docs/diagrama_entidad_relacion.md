@@ -59,8 +59,8 @@ Detalle exhaustivo de cada campo que compone la tabla física `checkpoints`:
 | `id` | `INTEGER` | `long` / `LongProperty` | **NO** | `PRIMARY KEY AUTOINCREMENT` | Identificador unívoco del punto de control generado secuencialmente por SQLite. |
 | `nombre` | `TEXT` | `String` / `StringProperty` | **NO** | `NOT NULL`, longitud mínima 1 caracter (tras `trim()`). | Denominación o rótulo del checkpoint (ej. *"Campamento Base"*, *"Abra del Viento"*). |
 | `hora` | `TEXT` | `String` / `StringProperty` | **NO** | `NOT NULL`, formato estricto `HH:mm` (24 horas). | Hora estimada o registrada de arribo al punto de control (ej. *"14:30"*). |
-| `latitud` | `REAL` | `double` / `DoubleProperty` | **NO** | `NOT NULL`, rango `[-90.0, 90.0]`. | Latitud en coordenadas geográficas WGS84 (grados decimales con signo). |
-| `longitud` | `REAL` | `double` / `DoubleProperty` | **NO** | `NOT NULL`, rango `[-180.0, 180.0]`. | Longitud en coordenadas geográficas WGS84 (grados decimales con signo). |
+| `latitud` | `REAL` | `double` / `DoubleProperty` | **NO** | `NOT NULL`, no vacío en el formulario, rango `[-90.0, 90.0]`. | Latitud en coordenadas geográficas WGS84 (grados decimales con signo). |
+| `longitud` | `REAL` | `double` / `DoubleProperty` | **NO** | `NOT NULL`, no vacío en el formulario, rango `[-180.0, 180.0]`. | Longitud en coordenadas geográficas WGS84 (grados decimales con signo). |
 | `descripcion` | `TEXT` | `String` / `StringProperty` | **SÍ** | Opcional (`NULL` permitido). | Texto descriptivo con detalles topográficos, agua, estado del sendero o referencias. |
 
 ---
